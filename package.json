@@ -2,7 +2,7 @@
   "name": "distacted",
   "description": "block distracting websites with customizable unlock challenges",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.0-beta.1",
   "type": "module",
   "scripts": {
     "dev": "wxt",
