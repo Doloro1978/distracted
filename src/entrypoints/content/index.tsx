@@ -10,7 +10,7 @@ export default defineContentScript({
     const ui = await createShadowRootUi(ctx, {
       name: "wxt-react-example",
       position: "inline",
-      anchor: "body",
+      anchor: document.documentElement,
       append: "first",
       onMount: (container) => {
         // Don't mount react app directly on <body>
