@@ -50,6 +50,17 @@ jobs:
           bun run zip
           bun run zip:firefox
 
+      - name: create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: |
+            .output/*-chrome.zip
+            .output/*-firefox.zip
+            .output/*-sources.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: submit to stores
         run: |
           bunx wxt submit \

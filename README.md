@@ -1,10 +1,22 @@
 # distacted
 
-blocks distracting websites! annoy you to get back on them...
+blocks distracting websites! do mini tasks to get back on them...
 
 ## what?
 
 - blocks websites that distract you
-- unlock challenges: timer, hold button, or type challenge
+- multiple unlock challenges (more soon):
+  - timer
+  - hold button
+  - typing a random UUID (no copy/paste)
 - (optionally) track your visits and success rate
 - all data stays local on your device
+
+
+## how to (re)build
+
+```bash
+bun install
+bun run zip
+bun run zip:firefox
+```

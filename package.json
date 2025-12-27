@@ -1,8 +1,8 @@
 {
   "name": "distacted",
-  "description": "block distracting websites with customizable unlock challenges",
+  "description": "blocks distracting websites! do mini tasks to get back on them...",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
