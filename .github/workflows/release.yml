@@ -12,11 +12,7 @@ on:
         type: string
 
 jobs:
-  validate:
-    uses: ./.github/workflows/validate.yml
-
   submit:
-    needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -44,6 +40,9 @@ jobs:
 
       - name: install dependencies
         run: bun install --frozen-lockfile
+
+      - name: compile
+        run: bun run compile
 
       - name: zip extensions
         run: |
