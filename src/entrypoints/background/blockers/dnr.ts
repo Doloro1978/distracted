@@ -1,21 +1,5 @@
-/**
- * Declarative Net Request (DNR) based blocker for Chrome MV3
- *
- * This module manages DNR rules to intercept and redirect blocked URLs
- * to the extension's blocked page before they load.
- */
-
-import {
-  getBlockedSites,
-  urlMatchesSiteRules,
-  type BlockedSite,
-} from "@/lib/storage";
-import {
-  RULE_ID_BASE,
-  MAX_RULES_PER_SITE,
-  UNLOCK_PREFIX,
-  ALARM_PREFIX,
-} from "@/lib/consts";
+import { getBlockedSites, urlMatchesSiteRules } from "@/lib/storage";
+import { RULE_ID_BASE, UNLOCK_PREFIX, ALARM_PREFIX } from "@/lib/consts";
 import { isInternalUrl } from "../utils";
 
 interface UnlockState {
@@ -42,39 +26,90 @@ export async function syncDnrRules(): Promise<void> {
   }
 
   const newRules: Browser.declarativeNetRequest.Rule[] = [];
+  let ruleIndex = 0;
 
-  sites.forEach((site, index) => {
+  const patternToRegex = (pattern: string): string => {
+    const normalized = pattern
+      .toLowerCase()
+      .trim()
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "");
+
+    const hasPath = normalized.includes("/");
+    let hostPattern: string;
+    let pathPattern: string = "";
+
+    if (hasPath) {
+      const slashIndex = normalized.indexOf("/");
+      hostPattern = normalized.slice(0, slashIndex);
+      pathPattern = normalized.slice(slashIndex);
+    } else {
+      hostPattern = normalized;
+    }
+
+    let hostRegex: string;
+    if (hostPattern.startsWith("*.")) {
+      const domain = hostPattern.slice(2);
+      const escapedDomain = domain
+        .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*/g, ".*");
+      hostRegex = `([a-z0-9-]+\\.)*${escapedDomain}`;
+    } else if (hostPattern.includes("*")) {
+      const escapedHost = hostPattern
+        .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*/g, ".*");
+      hostRegex = `(www\\.)?${escapedHost}`;
+    } else {
+      const escapedHost = hostPattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+      hostRegex = `(www\\.)?${escapedHost}`;
+    }
+
+    let pathRegex: string;
+    if (pathPattern) {
+      const escapedPath = pathPattern
+        .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*/g, ".*");
+      if (pathPattern.endsWith("*")) {
+        pathRegex = escapedPath;
+      } else {
+        pathRegex = `${escapedPath}(/.*|\\?.*)?`;
+      }
+    } else {
+      pathRegex = "(/.*)?";
+    }
+
+    return `^https?://${hostRegex}${pathRegex}$`;
+  };
+
+  sites.forEach((site) => {
     if (!site.enabled) return;
     if (unlockedIds.has(site.id)) return;
 
-    const blockPatterns = site.rules.filter((r) => !r.allow);
-
-    blockPatterns.forEach((rule, patternIndex) => {
-      let normalized = rule.pattern
-        .toLowerCase()
-        .trim()
-        .replace(/^https?:\/\//, "")
-        .replace(/^www\./, "");
-
-      let dnrFilter = `||${normalized}`;
-      if (normalized.startsWith("*.")) {
-        const domain = normalized.slice(2);
-        dnrFilter = `||${domain}`;
-      }
-
-      let pattern = dnrFilter.replace(/^\|\|/, "");
-      pattern = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-      pattern = pattern.replace(/\*/g, ".*");
-      const regexFilter = `^(https?://(www\\.)?${pattern}.*)$`;
-
+    const blockRules = site.rules.filter((r) => !r.allow);
+    blockRules.forEach((rule) => {
       newRules.push({
-        id: RULE_ID_BASE + index * MAX_RULES_PER_SITE + patternIndex,
+        id: RULE_ID_BASE + ruleIndex++,
         priority: 1,
         action: {
           type: "block",
         },
         condition: {
-          regexFilter,
+          regexFilter: patternToRegex(rule.pattern),
+          resourceTypes: ["main_frame"],
+        },
+      });
+    });
+
+    const allowRules = site.rules.filter((r) => r.allow);
+    allowRules.forEach((rule) => {
+      newRules.push({
+        id: RULE_ID_BASE + ruleIndex++,
+        priority: 2,
+        action: {
+          type: "allow",
+        },
+        condition: {
+          regexFilter: patternToRegex(rule.pattern),
           resourceTypes: ["main_frame"],
         },
       });

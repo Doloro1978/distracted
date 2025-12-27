@@ -1,13 +1,3 @@
-/**
- * WebRequest-based blocker for Firefox MV2
- *
- * Uses webRequest.onBeforeRequest with blocking to intercept and redirect
- * blocked URLs to the extension's blocked page.
- *
- * Note: MV2 doesn't have storage.session, so we use in-memory storage
- * for unlock state (resets on browser restart).
- */
-
 import {
   getBlockedSites,
   urlMatchesSiteRules,

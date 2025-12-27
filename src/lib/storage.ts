@@ -76,8 +76,6 @@ export async function updateBlockedSite(
   }
 }
 
-
-
 export async function getStats(): Promise<SiteStats[]> {
   const result = (await browser.storage.local.get(
     STORAGE_KEYS.STATS
@@ -92,51 +90,81 @@ export async function getSettings(): Promise<Settings> {
   return { ...defaultSettings, ...(result[STORAGE_KEYS.SETTINGS] ?? {}) };
 }
 
-
-
 export function urlMatchesPattern(url: string, pattern: string): boolean {
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname.toLowerCase();
     const pathname = urlObj.pathname.toLowerCase();
 
-    let normalizedPattern = pattern.toLowerCase().trim();
-    normalizedPattern = normalizedPattern
+    const normalizedPattern = pattern
+      .toLowerCase()
+      .trim()
       .replace(/^https?:\/\//, "")
       .replace(/^www\./, "");
 
     if (normalizedPattern.includes("/")) {
-      const [patternHost, ...pathParts] = normalizedPattern.split("/");
-      const patternPath = "/" + pathParts.join("/");
+      const slashIndex = normalizedPattern.indexOf("/");
+      const hostPattern = normalizedPattern.slice(0, slashIndex);
+      const pathPattern = normalizedPattern.slice(slashIndex);
+      const normalizedPath = pathname.toLowerCase();
+      const normalizedPathPattern = pathPattern.toLowerCase();
 
+      const normalizedHost = hostname.toLowerCase().replace(/^www\./, "");
       let hostMatches = false;
-      if (patternHost.startsWith("*.")) {
-        const domain = patternHost.slice(2);
-        hostMatches = hostname === domain || hostname.endsWith("." + domain);
+
+      if (hostPattern.startsWith("*.")) {
+        const domain = hostPattern.slice(2);
+        hostMatches =
+          normalizedHost === domain || normalizedHost.endsWith("." + domain);
+      } else if (hostPattern.includes("*")) {
+        const regexPattern = hostPattern
+          .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+          .replace(/\*/g, ".*");
+        const regex = new RegExp(`^${regexPattern}$`, "i");
+        hostMatches =
+          regex.test(normalizedHost) || regex.test(hostname.toLowerCase());
       } else {
         hostMatches =
-          hostname === patternHost ||
-          hostname === "www." + patternHost ||
-          hostname.replace(/^www\./, "") === patternHost;
+          normalizedHost === hostPattern ||
+          hostname.toLowerCase() === hostPattern ||
+          hostname.toLowerCase() === "www." + hostPattern;
       }
 
       if (!hostMatches) return false;
 
+      if (normalizedPathPattern.includes("*")) {
+        const regexPattern = normalizedPathPattern
+          .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+          .replace(/\*/g, ".*");
+        const regex = new RegExp(`^${regexPattern}$`, "i");
+        return regex.test(normalizedPath);
+      }
+
+      const cleanPattern = normalizedPathPattern.replace(/\/$/, "");
+      const cleanPath = normalizedPath.replace(/\/$/, "");
       return (
-        pathname.startsWith(patternPath) ||
-        pathname === patternPath.replace(/\/$/, "")
+        cleanPath === cleanPattern || cleanPath.startsWith(cleanPattern + "/")
       );
     }
 
+    const normalizedHost = hostname.toLowerCase().replace(/^www\./, "");
     if (normalizedPattern.startsWith("*.")) {
       const domain = normalizedPattern.slice(2);
-      return hostname === domain || hostname.endsWith("." + domain);
+      return normalizedHost === domain || normalizedHost.endsWith("." + domain);
+    }
+
+    if (normalizedPattern.includes("*")) {
+      const regexPattern = normalizedPattern
+        .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*/g, ".*");
+      const regex = new RegExp(`^${regexPattern}$`, "i");
+      return regex.test(normalizedHost) || regex.test(hostname.toLowerCase());
     }
 
     return (
-      hostname === normalizedPattern ||
-      hostname === "www." + normalizedPattern ||
-      hostname.replace(/^www\./, "") === normalizedPattern
+      normalizedHost === normalizedPattern ||
+      hostname.toLowerCase() === normalizedPattern ||
+      hostname.toLowerCase() === "www." + normalizedPattern
     );
   } catch {
     return false;
