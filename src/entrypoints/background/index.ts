@@ -73,13 +73,6 @@ export default defineBackground(() => {
         console.log(`[distacted] Could not redirect tab ${tabId}:`, err);
       }
     }
-
-    try {
-      await browser.runtime.sendMessage({
-        type: "SITE_RELOCKED",
-        siteId,
-      });
-    } catch {}
   });
 
   async function checkAndBlockUrl(tabId: number, url: string, source: string) {
@@ -125,7 +118,7 @@ export default defineBackground(() => {
       try {
         switch (message.type) {
           case "CHECK_BLOCKED": {
-            const url = message.url as string;
+            const url = message.url;
             const site = await findMatchingBlockedSite(url);
             if (site) {
               const settings = await getSettings();
@@ -142,7 +135,7 @@ export default defineBackground(() => {
           }
 
           case "GET_SITE_INFO": {
-            const { siteId, url } = message as { siteId?: string; url: string };
+            const { siteId, url } = message;
             const settings = await getSettings();
 
             let site = null;
@@ -179,7 +172,7 @@ export default defineBackground(() => {
           }
 
           case "CHECK_UNLOCK_STATE": {
-            const { siteId } = message as { siteId: string };
+            const { siteId } = message;
             const unlockState = await getUnlockState(siteId);
             sendResponse({
               unlocked: !!unlockState,
@@ -189,36 +182,18 @@ export default defineBackground(() => {
           }
 
           case "UNLOCK_SITE": {
-            const { siteId, durationMinutes } = message as {
-              siteId: string;
-              durationMinutes: number | null;
-            };
+            const { siteId, durationMinutes } = message;
 
             const { expiresAt } = isMV3
               ? await dnr.grantAccess(siteId, durationMinutes)
               : await webRequest.grantAccess(siteId, durationMinutes);
-
-            try {
-              await browser.runtime.sendMessage({
-                type: "SITE_UNLOCKED",
-                siteId,
-                expiresAt,
-              });
-            } catch {}
 
             sendResponse({ success: true, expiresAt });
             break;
           }
 
           case "UPDATE_STATS": {
-            const { siteId, update } = message as {
-              siteId: string;
-              update: {
-                incrementVisit?: boolean;
-                incrementPassed?: boolean;
-                addTime?: number;
-              };
-            };
+            const { siteId, update } = message;
             await updateStats(siteId, update);
             sendResponse({ success: true });
             break;

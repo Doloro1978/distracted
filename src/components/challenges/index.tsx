@@ -1,58 +1,97 @@
-import {
-  IconClock,
-  IconHandStop,
-  IconKeyboard,
-} from "@tabler/icons-react";
-import type { UnlockMethod } from "@/lib/storage";
+import { IconClock, IconHandStop, IconKeyboard } from "@tabler/icons-react";
 import { TimerChallenge } from "./timer";
 import { HoldChallenge } from "./hold";
 import { TypeChallenge } from "./type";
-import type { ComponentType } from "react";
 
-export interface ChallengeComponentProps {
-  duration?: number;
+type ChallengeOptionValue = number | string | boolean;
+type ChallengeOptions = Record<string, ChallengeOptionValue>;
+
+export interface ChallengeComponentProps<Options extends ChallengeOptions> {
+  settings: Options;
   onComplete: () => void;
 }
 
-export const CHALLENGE_COMPONENTS: Record<
-  UnlockMethod,
-  ComponentType<ChallengeComponentProps>
-> = {
-  timer: TimerChallenge as ComponentType<ChallengeComponentProps>,
-  hold: HoldChallenge as ComponentType<ChallengeComponentProps>,
-  type: TypeChallenge as ComponentType<ChallengeComponentProps>,
+type OptionDefinition<T extends ChallengeOptionValue> = {
+  label: string;
+  default: T;
+  description: string;
 };
 
-export const CHALLENGE_METADATA: Record<
-  UnlockMethod,
-  {
-    label: string;
-    icon: React.ReactNode;
-    description: string;
-    title: string;
-  }
-> = {
-  timer: {
+type Challenge<Options extends ChallengeOptions = ChallengeOptions> = {
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+  title: string;
+  options: {
+    [K in keyof Options]: OptionDefinition<Options[K]>;
+  };
+  render: (props: ChallengeComponentProps<Options>) => React.ReactNode;
+};
+
+const define = <Options extends ChallengeOptions>(
+  challenge: Challenge<Options>
+) => challenge;
+
+export const CHALLENGES = {
+  timer: define({
     label: "Wait Timer",
     icon: <IconClock className="size-5" />,
     description: "Wait for a countdown to finish",
     title: "Wait to Access",
-  },
-  hold: {
+    options: {
+      duration: {
+        label: "Duration (seconds)",
+        default: 10,
+        description: "The duration of the timer",
+      },
+    },
+    render: (props) => <TimerChallenge {...props} />,
+  }),
+  hold: define({
     label: "Hold Button",
     icon: <IconHandStop className="size-5" />,
     description: "Hold a button continuously",
     title: "Hold to Access",
-  },
-  type: {
+    options: {
+      duration: {
+        label: "Duration (seconds)",
+        default: 10,
+        description: "How long to hold the button for",
+      },
+    },
+    render: (props) => <HoldChallenge {...props} />,
+  }),
+  type: define({
     label: "Type Text",
     icon: <IconKeyboard className="size-5" />,
     description: "Type a random UUID (no copy/paste)",
     title: "Type to Access",
-  },
+    options: {},
+    render: (props) => <TypeChallenge {...props} />,
+  }),
+} as const;
+
+// Type exports for storage layer
+export type UnlockMethod = keyof typeof CHALLENGES;
+
+// Infer the settings type for each challenge from its options defaults
+type InferChallengeSettings<T> = T extends { options: infer O }
+  ? { [K in keyof O]: O[K] extends { default: infer D } ? D : never }
+  : never;
+
+// Map of unlock method to its settings type
+export type ChallengeSettingsMap = {
+  [K in UnlockMethod]: InferChallengeSettings<(typeof CHALLENGES)[K]>;
 };
 
-// Re-export components
-export { TimerChallenge } from "./timer";
-export { HoldChallenge } from "./hold";
-export { TypeChallenge } from "./type";
+// Get default settings for a challenge
+export function getDefaultChallengeSettings<M extends UnlockMethod>(
+  method: M
+): ChallengeSettingsMap[M] {
+  const challenge = CHALLENGES[method];
+  const settings: Record<string, ChallengeOptionValue> = {};
+  for (const [key, opt] of Object.entries(challenge.options)) {
+    settings[key] = (opt as OptionDefinition<ChallengeOptionValue>).default;
+  }
+  return settings as ChallengeSettingsMap[M];
+}

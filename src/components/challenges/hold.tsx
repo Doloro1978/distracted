@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { IconHandStop, IconCheck } from "@tabler/icons-react";
+import type { ChallengeComponentProps } from "./index";
 
-export const HoldChallenge = memo(function HoldChallenge({
-  duration,
+export const HoldChallenge = memo(({
+  settings,
   onComplete,
-}: {
-  duration: number;
-  onComplete: () => void;
-}) {
+}: ChallengeComponentProps<{ duration: number }>) => {
+  const { duration } = settings;
   const [holding, setHolding] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [completed, setCompleted] = useState(false);
@@ -105,3 +104,5 @@ export const HoldChallenge = memo(function HoldChallenge({
     </div>
   );
 });
+
+HoldChallenge.displayName = "HoldChallenge";

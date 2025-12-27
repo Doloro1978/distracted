@@ -8,7 +8,6 @@ import {
   getSettings,
   saveSettings,
   clearStats,
-  DEFAULT_AUTO_RELOCK,
   type BlockedSite,
   type SiteStats,
   type Settings,
@@ -16,7 +15,12 @@ import {
   type PatternRule,
 } from "@/lib/storage";
 import { formatDuration } from "@/lib/utils";
-import { UNLOCK_METHOD_INFO } from "@/lib/consts";
+import { DEFAULT_AUTO_RELOCK } from "@/lib/consts";
+import {
+  CHALLENGES,
+  getDefaultChallengeSettings,
+  type ChallengeSettingsMap,
+} from "@/components/challenges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,9 +35,6 @@ import {
   IconSettings,
   IconShieldLock,
   IconArrowLeft,
-  IconHandStop,
-  IconClock,
-  IconKeyboard,
   IconRefresh,
   IconEdit,
   IconCheck,
@@ -108,6 +109,20 @@ const SiteItem = memo(function SiteItem({
 }) {
   const blockRules = site.rules.filter((r) => !r.allow);
   const allowRules = site.rules.filter((r) => r.allow);
+  const challenge = CHALLENGES[site.unlockMethod];
+
+  // Format challenge settings for display
+  const settingsSummary = useMemo(() => {
+    const settings = site.challengeSettings;
+    const parts: string[] = [];
+    for (const [key, opt] of Object.entries(challenge.options)) {
+      const value = settings[key as keyof typeof settings];
+      if (value !== undefined) {
+        parts.push(`${value}${key === "duration" ? "s" : ""}`);
+      }
+    }
+    return parts.length > 0 ? parts.join(", ") : null;
+  }, [site.challengeSettings, challenge.options]);
 
   return (
     <div
@@ -122,7 +137,7 @@ const SiteItem = memo(function SiteItem({
             variant={site.enabled ? "default" : "secondary"}
             className="text-xs shrink-0"
           >
-            {UNLOCK_METHOD_INFO[site.unlockMethod].label}
+            {challenge.label}
           </Badge>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -171,7 +186,7 @@ const SiteItem = memo(function SiteItem({
       </div>
 
       <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-        <span>{site.unlockDuration}s to unlock</span>
+        {settingsSummary && <span>{settingsSummary} to unlock</span>}
         {site.autoRelockAfter && (
           <span className="flex items-center gap-1">
             <IconRefresh className="size-3" />
@@ -236,7 +251,9 @@ export default function App() {
     { pattern: "", allow: false },
   ]);
   const [formMethod, setFormMethod] = useState<UnlockMethod>("timer");
-  const [formDuration, setFormDuration] = useState("10");
+  const [formChallengeSettings, setFormChallengeSettings] = useState<
+    ChallengeSettingsMap[UnlockMethod]
+  >(() => getDefaultChallengeSettings("timer"));
   const [formAutoRelock, setFormAutoRelock] = useState(
     String(DEFAULT_AUTO_RELOCK)
   );
@@ -261,7 +278,7 @@ export default function App() {
     setFormName("");
     setFormRules([{ pattern: "", allow: false }]);
     setFormMethod("timer");
-    setFormDuration("10");
+    setFormChallengeSettings(getDefaultChallengeSettings("timer"));
     setFormAutoRelock(String(DEFAULT_AUTO_RELOCK));
     setEditingSite(null);
   }, []);
@@ -296,7 +313,7 @@ export default function App() {
       name: formName.trim(),
       rules: validRules.map((r) => ({ ...r, pattern: r.pattern.trim() })),
       unlockMethod: formMethod,
-      unlockDuration: parseInt(formDuration) || 10,
+      challengeSettings: formChallengeSettings,
       autoRelockAfter: formAutoRelock ? parseInt(formAutoRelock) : null,
       enabled: true,
     };
@@ -314,7 +331,7 @@ export default function App() {
     formName,
     formRules,
     formMethod,
-    formDuration,
+    formChallengeSettings,
     formAutoRelock,
     editingSite,
     resetForm,
@@ -328,7 +345,9 @@ export default function App() {
       site.rules.length > 0 ? site.rules : [{ pattern: "", allow: false }]
     );
     setFormMethod(site.unlockMethod);
-    setFormDuration(String(site.unlockDuration));
+    setFormChallengeSettings(
+      site.challengeSettings ?? getDefaultChallengeSettings(site.unlockMethod)
+    );
     setFormAutoRelock(site.autoRelockAfter ? String(site.autoRelockAfter) : "");
     setView("edit");
   }, []);
@@ -523,68 +542,118 @@ export default function App() {
             <div className="space-y-2">
               <Label>Unlock Method</Label>
               <div className="grid gap-2">
-                {(Object.keys(UNLOCK_METHOD_INFO) as UnlockMethod[]).map(
-                  (method) => {
-                    const info = UNLOCK_METHOD_INFO[method];
-                    return (
-                      <button
-                        key={method}
-                        type="button"
-                        onClick={() => setFormMethod(method)}
-                        className={`flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
+                {(Object.keys(CHALLENGES) as UnlockMethod[]).map((method) => {
+                  const challenge = CHALLENGES[method];
+                  return (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => {
+                        setFormMethod(method);
+                        setFormChallengeSettings(
+                          getDefaultChallengeSettings(method)
+                        );
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
+                        formMethod === method
+                          ? "bg-primary/15"
+                          : "bg-muted/30 hover:bg-muted/50"
+                      }`}
+                    >
+                      <div
+                        className={`p-2 rounded-md ${
                           formMethod === method
-                            ? "bg-primary/15"
-                            : "bg-muted/30 hover:bg-muted/50"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted/50 text-muted-foreground"
                         }`}
                       >
-                        <div
-                          className={`p-2 rounded-md ${
-                            formMethod === method
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted/50 text-muted-foreground"
-                          }`}
-                        >
-                          {info.icon}
+                        {challenge.icon}
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">
+                          {challenge.label}
                         </div>
-                        <div>
-                          <div className="font-medium text-sm">
-                            {info.label}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {info.description}
-                          </div>
+                        <div className="text-xs text-muted-foreground">
+                          {challenge.description}
                         </div>
-                      </button>
-                    );
-                  }
-                )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="duration">
-                  {formMethod === "type" ? "Text Length" : "Duration (sec)"}
-                </Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min="1"
-                  value={formDuration}
-                  onChange={(e) => setFormDuration(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="relock">Auto-relock (min)</Label>
-                <Input
-                  id="relock"
-                  type="number"
-                  min="1"
-                  placeholder="Never"
-                  value={formAutoRelock}
-                  onChange={(e) => setFormAutoRelock(e.target.value)}
-                />
-              </div>
+            {/* Dynamic challenge options */}
+            {(() => {
+              const challenge = CHALLENGES[formMethod];
+              const optionEntries = Object.entries(challenge.options);
+              if (optionEntries.length === 0) return null;
+
+              return (
+                <div className="space-y-3">
+                  <Label>Challenge Options</Label>
+                  <div
+                    className={`grid gap-3 ${optionEntries.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+                  >
+                    {optionEntries.map(([key, opt]) => (
+                      <div key={key} className="space-y-1">
+                        <Label
+                          htmlFor={`option-${key}`}
+                          className="text-xs font-normal text-muted-foreground"
+                        >
+                          {(opt as { label: string }).label}
+                        </Label>
+                        <Input
+                          id={`option-${key}`}
+                          type={
+                            typeof (opt as { default: unknown }).default ===
+                            "number"
+                              ? "number"
+                              : "text"
+                          }
+                          min={
+                            typeof (opt as { default: unknown }).default ===
+                            "number"
+                              ? "1"
+                              : undefined
+                          }
+                          value={String(
+                            formChallengeSettings[
+                              key as keyof typeof formChallengeSettings
+                            ] ?? (opt as { default: unknown }).default
+                          )}
+                          onChange={(e) => {
+                            const value =
+                              typeof (opt as { default: unknown }).default ===
+                              "number"
+                                ? parseInt(e.target.value) || 0
+                                : e.target.value;
+                            setFormChallengeSettings((prev) => ({
+                              ...prev,
+                              [key]: value,
+                            }));
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="space-y-2">
+              <Label htmlFor="relock">Auto-relock (minutes)</Label>
+              <Input
+                id="relock"
+                type="number"
+                min="1"
+                placeholder="Never"
+                value={formAutoRelock}
+                onChange={(e) => setFormAutoRelock(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                How long until the site is blocked again after unlocking
+              </p>
             </div>
 
             <Button

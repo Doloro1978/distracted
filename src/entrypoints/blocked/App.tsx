@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  type BlockedSite,
-  type UnlockMethod,
-} from "@/lib/storage";
+import { type BlockedSite } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,10 +16,7 @@ import {
   IconArrowLeft,
   IconLockOpen,
 } from "@tabler/icons-react";
-import {
-  CHALLENGE_COMPONENTS,
-  CHALLENGE_METADATA,
-} from "@/components/challenges/index";
+import { CHALLENGES } from "@/components/challenges";
 
 // Main blocked page component
 export default function BlockedPage() {
@@ -217,17 +211,7 @@ export default function BlockedPage() {
     return null;
   }
 
-  const methodIcons: Record<UnlockMethod, React.ReactNode> = {
-    timer: CHALLENGE_METADATA.timer.icon,
-    hold: CHALLENGE_METADATA.hold.icon,
-    type: CHALLENGE_METADATA.type.icon,
-  };
-
-  const methodTitles: Record<UnlockMethod, string> = {
-    timer: CHALLENGE_METADATA.timer.title,
-    hold: CHALLENGE_METADATA.hold.title,
-    type: CHALLENGE_METADATA.type.title,
-  };
+  const challenge = CHALLENGES[blockedSite.unlockMethod];
 
   return (
     <div
@@ -286,28 +270,15 @@ export default function BlockedPage() {
             /* Show the challenge */
             <div className="p-3 rounded-lg bg-muted/30">
               <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border/30">
-                <div className="text-primary">
-                  {methodIcons[blockedSite.unlockMethod]}
-                </div>
-                <span className="font-medium">
-                  {methodTitles[blockedSite.unlockMethod]}
-                </span>
+                <div className="text-primary">{challenge.icon}</div>
+                <span className="font-medium">{challenge.label}</span>
               </div>
 
-              {(() => {
-                const ChallengeComponent =
-                  CHALLENGE_COMPONENTS[blockedSite.unlockMethod];
-                return (
-                  <ChallengeComponent
-                    duration={
-                      blockedSite.unlockMethod === "type"
-                        ? undefined
-                        : blockedSite.unlockDuration
-                    }
-                    onComplete={handleChallengeComplete}
-                  />
-                );
-              })()}
+              {challenge.render({
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                settings: blockedSite.challengeSettings as any,
+                onComplete: handleChallengeComplete,
+              })}
             </div>
           )}
 

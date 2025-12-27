@@ -1,6 +1,10 @@
 // Types for the extension
+import type {
+  UnlockMethod,
+  ChallengeSettingsMap,
+} from "@/components/challenges";
 
-export type UnlockMethod = "timer" | "hold" | "type";
+export type { UnlockMethod, ChallengeSettingsMap };
 
 export interface PatternRule {
   pattern: string; // URL pattern (e.g., "twitter.com", "*.reddit.com", "x.com/messages")
@@ -12,7 +16,7 @@ export interface BlockedSite {
   name: string; // Display name for the rule set
   rules: PatternRule[]; // Multiple patterns with allow/deny
   unlockMethod: UnlockMethod;
-  unlockDuration: number; // seconds for timer/hold, or length of text to type
+  challengeSettings: ChallengeSettingsMap[UnlockMethod]; // Settings for the challenge
   autoRelockAfter: number | null; // minutes before re-locking, null = no auto-relock
   enabled: boolean;
   createdAt: number;
@@ -36,9 +40,6 @@ import { DEFAULT_AUTO_RELOCK, STORAGE_KEYS } from "./consts";
 export const defaultSettings: Settings = {
   statsEnabled: true,
 };
-
-// Re-export for backwards compatibility
-export { DEFAULT_AUTO_RELOCK };
 
 // Generate a short random ID
 export function generateId(): string {
@@ -154,7 +155,7 @@ export function urlMatchesPattern(url: string, pattern: string): boolean {
     const hostname = urlObj.hostname.toLowerCase();
     const pathname = urlObj.pathname.toLowerCase();
     const fullPath = hostname + pathname;
-    
+
     // Normalize pattern: strip protocol if accidentally included
     let normalizedPattern = pattern.toLowerCase().trim();
     normalizedPattern = normalizedPattern
@@ -233,7 +234,6 @@ export async function findMatchingBlockedSite(
   const sites = await getBlockedSites();
   return sites.find((site) => urlMatchesSiteRules(url, site)) || null;
 }
-
 
 // Get current tab URL (for popup)
 export async function getCurrentTabUrl(): Promise<string | null> {
