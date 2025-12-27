@@ -6,26 +6,42 @@ import {
   getCurrentTabUrl,
   extractDomain,
 } from "@/lib/storage";
-import {
-  initializeBlocker,
-  syncRules,
-  grantAccess,
-  isSiteUnlocked,
-  getUnlockState,
-  handleRelockAlarm,
+import * as dnr from "./blockers/dnr";
+import * as webRequest from "./blockers/webRequest";
+import { isInternalUrl } from "./utils";
+
+const isMV3 = import.meta.env.MANIFEST_VERSION === 3;
+console.log(`[distacted] background entry`, {
   isMV3,
-} from "@/lib/blocker";
-import { isInternalUrl } from "@/lib/utils";
+});
+
+async function syncRules(): Promise<void> {
+  if (isMV3) await dnr.syncDnrRules();
+  else await webRequest.syncRules();
+}
+
+async function isSiteUnlocked(siteId: string): Promise<boolean> {
+  if (isMV3) return dnr.isSiteUnlocked(siteId);
+  else return webRequest.isSiteUnlocked(siteId);
+}
+
+async function getUnlockState(
+  siteId: string
+): Promise<{ siteId: string; expiresAt: number } | null> {
+  if (isMV3) return dnr.getUnlockState(siteId);
+  else return webRequest.getUnlockState(siteId);
+}
 
 export default defineBackground(() => {
   console.log("[distacted] Background script initialized");
 
-  // Initialize the blocker (DNR for MV3, webRequest for MV2)
-  initializeBlocker().catch((err) => {
+  (async () => {
+    if (isMV3) await dnr.initializeDnr();
+    else await webRequest.initializeWebRequest();
+  })().catch((err) => {
     console.error("[distacted] Failed to initialize blocker:", err);
   });
 
-  // Re-sync rules when storage changes (blocked sites updated)
   browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "local" && changes.blockedSites) {
       console.log("[distacted] Blocked sites changed, syncing rules");
@@ -35,14 +51,14 @@ export default defineBackground(() => {
     }
   });
 
-  // Alarm listener for reliable relocking (survives service worker sleep)
   browser.alarms.onAlarm.addListener(async (alarm) => {
-    const result = await handleRelockAlarm(alarm.name);
+    const result = isMV3
+      ? await dnr.handleRelockAlarm(alarm.name)
+      : await webRequest.handleRelockAlarm(alarm.name);
     if (!result) return;
 
     const { siteId, tabsToRedirect } = result;
 
-    // Redirect all tabs that are on the blocked site
     for (const tabId of tabsToRedirect) {
       try {
         const tab = await browser.tabs.get(tabId);
@@ -58,34 +74,25 @@ export default defineBackground(() => {
       }
     }
 
-    // Broadcast relock event to any blocked pages
     try {
       await browser.runtime.sendMessage({
         type: "SITE_RELOCKED",
         siteId,
       });
-    } catch {
-      // No listeners, that's fine
-    }
+    } catch {}
   });
 
-  // Helper to check URL and redirect if blocked
-  // Used by webNavigation listeners for soft navigation detection
   async function checkAndBlockUrl(tabId: number, url: string, source: string) {
-    // Skip extension pages and internal URLs
     if (isInternalUrl(url)) return;
 
-    // Check if this URL is blocked
     const site = await findMatchingBlockedSite(url);
     if (!site) return;
 
-    // Check if currently unlocked
     const unlocked = await isSiteUnlocked(site.id);
     if (unlocked) return;
 
     console.log(`[distacted] Blocking (${source}): ${url}`);
 
-    // Redirect to blocked page
     const blockedPageUrl = browser.runtime.getURL(
       `/blocked.html?url=${encodeURIComponent(url)}&siteId=${encodeURIComponent(site.id)}`
     );
@@ -97,33 +104,22 @@ export default defineBackground(() => {
     }
   }
 
-  // WebNavigation listeners for catching navigations
-  // For MV3: Primary blocking mechanism (DNR just blocks as fallback)
-  // For MV2: Catches soft navigations that webRequest misses
   browser.webNavigation.onBeforeNavigate.addListener(async (details) => {
     if (details.frameId !== 0) return;
-    // For MV2, webRequest handles hard navigations, but we still want this
-    // for the redirect (webRequest can only block, this actually redirects)
-    // Actually for MV2 webRequest does redirect. But this catches things faster.
-    if (!isMV3) return; // Let webRequest handle it for MV2
+    if (!isMV3) return;
     await checkAndBlockUrl(details.tabId, details.url, "onBeforeNavigate");
   });
 
-  // Soft navigation detection (History API)
   browser.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
     if (details.frameId !== 0) return;
     await checkAndBlockUrl(details.tabId, details.url, "onHistoryStateUpdated");
   });
 
-  // Fallback: tabs.onUpdated catches URL changes
   browser.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
     if (!changeInfo.url) return;
-    // For MV2, webRequest handles hard navigations, skip those
-    // But still catch soft navigations
     await checkAndBlockUrl(tabId, changeInfo.url, "tabs.onUpdated");
   });
 
-  // Handle messages from popup and blocked page
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     (async () => {
       try {
@@ -198,18 +194,17 @@ export default defineBackground(() => {
               durationMinutes: number | null;
             };
 
-            const { expiresAt } = await grantAccess(siteId, durationMinutes);
+            const { expiresAt } = isMV3
+              ? await dnr.grantAccess(siteId, durationMinutes)
+              : await webRequest.grantAccess(siteId, durationMinutes);
 
-            // Broadcast to all blocked pages for this site
             try {
               await browser.runtime.sendMessage({
                 type: "SITE_UNLOCKED",
                 siteId,
                 expiresAt,
               });
-            } catch {
-              // No listeners, that's fine
-            }
+            } catch {}
 
             sendResponse({ success: true, expiresAt });
             break;

@@ -16,7 +16,7 @@ import {
   UNLOCK_PREFIX,
   ALARM_PREFIX,
 } from "@/lib/consts";
-import { isInternalUrl } from "@/lib/utils";
+import { isInternalUrl } from "../utils";
 
 interface UnlockState {
   siteId: string;

@@ -14,7 +14,7 @@ import {
   type BlockedSite,
 } from "@/lib/storage";
 import { ALARM_PREFIX } from "@/lib/consts";
-import { isInternalUrl } from "@/lib/utils";
+import { isInternalUrl } from "../utils";
 
 interface UnlockState {
   siteId: string;
