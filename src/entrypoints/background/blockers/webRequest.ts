@@ -28,8 +28,6 @@ export async function refreshCache(): Promise<void> {
   cachedSites = await getBlockedSites();
 }
 
-
-
 export async function initializeWebRequest(): Promise<void> {
   await refreshCache();
 
@@ -69,7 +67,10 @@ export async function initializeWebRequest(): Promise<void> {
 
           if (tabId && tabId !== -1) {
             browser.tabs.update(tabId, { url: blockedPageUrl }).catch((err) => {
-              console.error(`[distacted] Failed to redirect tab ${tabId}:`, err);
+              console.error(
+                `[distacted] Failed to redirect tab ${tabId}:`,
+                err
+              );
             });
           }
 

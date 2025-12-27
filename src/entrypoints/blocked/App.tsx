@@ -9,7 +9,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import {
-  IconShieldLock,
+  IconClockHour5Filled,
   IconCheck,
   IconX,
   IconArrowRight,
@@ -222,27 +222,28 @@ export default function BlockedPage() {
       />
 
       <Card className="w-full max-w-md relative bg-card/95 backdrop-blur shadow-2xl">
-        <CardHeader className="text-center pb-2 flex">
-          <div className="p-3 rounded-full bg-primary/10 w-fit">
-            <IconShieldLock className="size-8 text-primary" />
-          </div>
-          <div className="flex flex-col ml-2 items-start justify-center gap-1">
+        <CardHeader className="text-center flex flex-col gap-2">
+          <div className="flex gap-2 items-center">
+            <IconClockHour5Filled className="size-6 text-primary" />
             <CardTitle className="text-xl">Site Blocked</CardTitle>
-            <CardDescription>
-              <span className="text-sm bg-muted/50 px-2 py-0.5 rounded font-medium">
-                {blockedSite.name}
-              </span>
-            </CardDescription>
+          </div>
+          <div className="flex gap-2 text-xs items-center max-w-full">
+            <span className="bg-muted/50 px-2 py-0.5 rounded font-medium">
+              {blockedSite.name}
+            </span>
+            {originalUrl && (
+              <div className="text-muted-foreground font-mono truncate bg-muted/50 px-2 py-0.5 rounded">
+                {originalUrl
+                  .replace(/^https?:\/\//, "")
+                  .split("/")
+                  .filter(Boolean)
+                  .join("/")}
+              </div>
+            )}
           </div>
         </CardHeader>
 
         <CardContent className="space-y-3">
-          {originalUrl && (
-            <div className="text-xs text-muted-foreground text-center truncate px-4 -mt-2 mb-2">
-              {originalUrl}
-            </div>
-          )}
-
           {alreadyUnlocked ? (
             <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
               <div className="flex items-center gap-3 text-green-500">

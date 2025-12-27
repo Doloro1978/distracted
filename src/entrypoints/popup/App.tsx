@@ -28,13 +28,13 @@ import {
   IconPlayerPlay,
   IconChartBar,
   IconSettings,
-  IconShieldLock,
   IconArrowLeft,
   IconRefresh,
   IconEdit,
   IconCheck,
   IconX,
   IconWorld,
+  IconClockHour5Filled,
 } from "@tabler/icons-react";
 
 type View = "main" | "add" | "edit" | "stats" | "settings";
@@ -374,7 +374,9 @@ export default function App() {
   const handleDeleteSite = useCallback(
     async (id: string) => {
       const sites = await getBlockedSites();
-      await browser.storage.local.set({ ["blockedSites"]: sites.filter((s) => s.id !== id) });
+      await browser.storage.local.set({
+        ["blockedSites"]: sites.filter((s) => s.id !== id),
+      });
       loadData();
     },
     [loadData]
@@ -440,7 +442,7 @@ export default function App() {
               <IconArrowLeft className="size-4" />
             </Button>
           )}
-          <IconShieldLock className="size-5 text-primary" />
+          <IconClockHour5Filled className="size-5 text-primary" />
           <h1 className="text-lg font-bold tracking-tight">
             {view === "main" && "distacted"}
             {view === "add" && "Block Site"}
@@ -474,7 +476,7 @@ export default function App() {
           <div className="space-y-3">
             {sites.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                <IconShieldLock className="size-12 mx-auto mb-3 opacity-30" />
+                <IconClockHour5Filled className="size-12 mx-auto mb-3 opacity-30" />
                 <p className="text-sm">No blocked sites yet</p>
                 <p className="text-xs mt-1">
                   Add your first distraction to block

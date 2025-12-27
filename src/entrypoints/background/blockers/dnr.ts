@@ -23,13 +23,11 @@ interface UnlockState {
   expiresAt: number;
 }
 
-
-
 export async function syncDnrRules(): Promise<void> {
   const sites = await getBlockedSites();
   const existingRules = await browser.declarativeNetRequest.getDynamicRules();
   const existingRuleIds = existingRules.map((r) => r.id);
-  
+
   const session = await browser.storage.session.get();
   const unlockedIds = new Set<string>();
   const now = Date.now();
@@ -92,8 +90,6 @@ export async function syncDnrRules(): Promise<void> {
     `[distacted] DNR rules synced: ${newRules.length} rules for ${sites.filter((s) => s.enabled).length} sites`
   );
 }
-
-
 
 export async function grantAccess(
   siteId: string,
@@ -218,5 +214,3 @@ export async function initializeDnr(): Promise<void> {
 
   await syncDnrRules();
 }
-
-
